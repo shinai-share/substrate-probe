@@ -3,12 +3,18 @@
 八つの世界を作り、それぞれの材質を封緘する。中に置いたAIエージェントたちが実験を打ち、
 予測を先に凍結し、結論を出す。**そして封を切る。**
 
+**`viewer/index.html` を開き、「探査を開始する」を押す。** 装置が走り、探査者たちの
+振る舞い —— 封緘・配分・実験・凍結・合議・開封 —— が目の前で進行する。
+依存なし・オフラインで動く。これは録画の再生ではなく、押すたびに別の世界が生成される
+**実験機であり、実験観測機である**。
+
 ```bash
-python -m substrate_probe.demo --worlds 8   # 依存なし・数秒
-pytest tests/ -q
+python -m substrate_probe.demo --worlds 8   # 同じ装置をCLIで(依存なし・数秒)
+pytest tests/ -q                            # 74テスト
+python tools/build_viewer.py                # 画面の再生成(engine.js を注入)
 ```
 
-`viewer/index.html` を開くと、粒子場と実測が見られる(オフラインで動く)。
+`viewer/report.html` は初回実測(8世界)の記録である。
 
 ---
 
@@ -112,6 +118,8 @@ pytest tests/ -q
 | `hypothesis.py` | 仮説の空間。予測の無い主張は受理しない |
 | `investigation.py` | 一周の鎖と、複数世界を跨いだ信念の隙間 |
 | `llm_scientist.py` | 言語モデルを探査者にする層 |
+| `viewer/engine.js` | ブラウザ実行系。Python が参照実装で、照合テストがずれを封じる |
+| `viewer/app_template.html` | 画面の原本。`tools/build_viewer.py` が index.html を生成 |
 | `decorrelation.py` | 証拠を分けても収束したかの実測 |
 | `measurement_audit.py` | 観測・時間・因果の三軸で測定の妥当性を審査 |
 
