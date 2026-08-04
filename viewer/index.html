@@ -1,0 +1,503 @@
+<title>基体探査 — 内側から、世界の材質は見えるか</title>
+<style>
+  :root{
+    color-scheme: dark light;
+    --ground:#0A0E13; --panel:#111720; --ink:#E4E9EA; --muted:#7C8A93;
+    --rule:#1C2530; --rule-2:#2A3644;
+    --truth:#5FD3B2;      /* 真値 — 落ち着いた読み */
+    --belief:#F0A28C;     /* 信念 — 手で描いた期待 */
+    --veil:#7A7391;       /* 届かないもの */
+    --grid:rgba(95,211,178,.10);
+    --serif:"Hiragino Mincho ProN","Yu Mincho",YuMincho,"MS PMincho",serif;
+    --sans:"Hiragino Kaku Gothic ProN","Yu Gothic",YuGothic,Meiryo,system-ui,sans-serif;
+    --mono:ui-monospace,"SFMono-Regular",Consolas,"Courier New",monospace;
+  }
+  @media (prefers-color-scheme: light){
+    :root{
+      --ground:#F4F5F3; --panel:#FFFFFF; --ink:#131A1D; --muted:#68757A;
+      --rule:#DFE3E0; --rule-2:#C7CFCA;
+      --truth:#1F8F72; --belief:#C25F3E; --veil:#6B6383;
+      --grid:rgba(31,143,114,.12);
+    }
+  }
+  :root[data-theme="light"]{
+    --ground:#F4F5F3; --panel:#FFFFFF; --ink:#131A1D; --muted:#68757A;
+    --rule:#DFE3E0; --rule-2:#C7CFCA;
+    --truth:#1F8F72; --belief:#C25F3E; --veil:#6B6383;
+    --grid:rgba(31,143,114,.12);
+  }
+  :root[data-theme="dark"]{
+    --ground:#0A0E13; --panel:#111720; --ink:#E4E9EA; --muted:#7C8A93;
+    --rule:#1C2530; --rule-2:#2A3644;
+    --truth:#5FD3B2; --belief:#F0A28C; --veil:#7A7391;
+    --grid:rgba(95,211,178,.10);
+  }
+
+  *{box-sizing:border-box}
+  body{
+    margin:0; background:var(--ground); color:var(--ink);
+    font-family:var(--sans); font-size:15px; line-height:1.85;
+    -webkit-font-smoothing:antialiased;
+  }
+  .wrap{max-width:66rem; margin:0 auto; padding:0 1.5rem 7rem}
+  .col{max-width:40rem}
+  h1,h2,h3,.serif{font-family:var(--serif); font-weight:400}
+  h1{font-size:clamp(1.9rem,4.6vw,3rem); line-height:1.4; margin:0 0 1rem;
+     letter-spacing:.02em; text-wrap:balance}
+  h2{font-size:1.35rem; margin:0 0 .6rem; letter-spacing:.03em; text-wrap:balance}
+  h3{font-size:1rem; margin:0; letter-spacing:.02em}
+  p{margin:0 0 1rem}
+  .eyebrow{font-family:var(--mono); font-size:.68rem; letter-spacing:.22em;
+    text-transform:uppercase; color:var(--muted); margin:0 0 .7rem}
+  .lead{color:var(--muted); margin-bottom:2rem}
+  section{margin-top:5rem}
+  .tnum{font-variant-numeric:tabular-nums}
+
+  /* --- 舞台: 基体そのもの --- */
+  .stage{position:relative; margin:0 -1.5rem; border-block:1px solid var(--rule);
+    background:var(--panel); overflow:hidden}
+  #field{display:block; width:100%; height:clamp(19rem,46vh,26rem)}
+  .stage-caption{
+    position:absolute; left:1.5rem; bottom:1.1rem; right:1.5rem;
+    display:flex; flex-wrap:wrap; gap:.6rem 1.4rem; align-items:center;
+    font-family:var(--mono); font-size:.72rem; color:var(--muted);
+    pointer-events:none;
+  }
+  .switch{display:flex; gap:.4rem; pointer-events:auto}
+  .switch button{
+    font:inherit; font-family:var(--mono); font-size:.72rem; letter-spacing:.08em;
+    color:var(--muted); background:transparent; border:1px solid var(--rule-2);
+    padding:.3rem .8rem; cursor:pointer; transition:color .2s, border-color .2s;
+  }
+  .switch button[aria-pressed="true"]{color:var(--truth); border-color:var(--truth)}
+  .switch button:hover{color:var(--ink)}
+  .switch button:focus-visible{outline:2px solid var(--truth); outline-offset:2px}
+
+  .hero{padding:4.5rem 0 3rem}
+  .thesis{
+    font-family:var(--serif); font-size:1.15rem; line-height:2.1;
+    border-left:2px solid var(--truth); padding-left:1.3rem; margin:2rem 0 0;
+    max-width:34rem;
+  }
+
+  /* --- 信念の隙間: この画面の中心 --- */
+  .gaps{display:grid; gap:.1rem; margin-top:2rem}
+  .gap-row{
+    display:grid; grid-template-columns:minmax(6rem,9rem) 1fr minmax(4.5rem,auto);
+    gap:.9rem; align-items:center; padding:.55rem 0;
+    border-bottom:1px solid var(--rule);
+  }
+  .gap-name{font-size:.82rem; color:var(--ink)}
+  .gap-name small{display:block; color:var(--muted); font-size:.7rem; line-height:1.5}
+  .track{position:relative; height:1.55rem}
+  .track::before{
+    content:""; position:absolute; inset-inline:0; top:50%; height:1px;
+    background:var(--rule-2);
+  }
+  .bar{position:absolute; top:50%; height:3px; transform:translateY(-50%);
+    background:var(--belief); opacity:.5}
+  .pin{position:absolute; top:50%; width:.62rem; height:.62rem;
+    transform:translate(-50%,-50%) rotate(45deg)}
+  .pin.t{background:var(--truth)}
+  .pin.b{background:var(--belief); border-radius:50%; transform:translate(-50%,-50%)}
+  .gap-val{font-family:var(--mono); font-size:.8rem; text-align:right; color:var(--belief)}
+  .gap-row.veiled .gap-name{color:var(--veil)}
+  .gap-row.veiled .gap-val{color:var(--veil); font-size:.72rem}
+  .legend{display:flex; flex-wrap:wrap; gap:.5rem 1.6rem; margin-top:1.2rem;
+    font-size:.76rem; color:var(--muted)}
+  .legend span{display:flex; align-items:center; gap:.5rem}
+  .swatch{width:.62rem; height:.62rem; flex:none}
+  .swatch.t{background:var(--truth); transform:rotate(45deg)}
+  .swatch.b{background:var(--belief); border-radius:50%}
+  .swatch.v{background:var(--veil)}
+
+  /* --- 世界の記録 --- */
+  .worlds{display:grid; grid-template-columns:repeat(auto-fill,minmax(15rem,1fr));
+    gap:1px; background:var(--rule); border:1px solid var(--rule); margin-top:2rem}
+  .world{background:var(--panel); padding:1.1rem 1.15rem 1.25rem}
+  .world.spot{background:color-mix(in srgb, var(--belief) 9%, var(--panel))}
+  .world-head{display:flex; justify-content:space-between; align-items:baseline;
+    gap:.6rem; margin-bottom:.7rem}
+  .wid{font-family:var(--mono); font-size:.72rem; letter-spacing:.1em; color:var(--muted)}
+  .score{font-family:var(--mono); font-size:1.35rem}
+  .score.hit{color:var(--truth)} .score.miss{color:var(--belief)}
+  .facts{display:grid; gap:.32rem; font-size:.75rem}
+  .fact{display:grid; grid-template-columns:3.2rem 1fr; gap:.5rem; align-items:baseline}
+  .fact b{font-weight:400; color:var(--muted); font-family:var(--mono); font-size:.66rem;
+    letter-spacing:.06em}
+  .chips{display:flex; flex-wrap:wrap; gap:.25rem}
+  .chip{font-family:var(--mono); font-size:.66rem; padding:.1rem .42rem;
+    border:1px solid currentColor; line-height:1.6}
+  .chip.t{color:var(--truth)} .chip.b{color:var(--belief)} .chip.n{color:var(--muted)}
+  .world-note{margin-top:.8rem; font-size:.74rem; color:var(--belief); line-height:1.7}
+
+  /* --- 検出可能性の三層 --- */
+  .tiers{display:grid; gap:1px; background:var(--rule); border:1px solid var(--rule);
+    margin-top:2rem}
+  .tier{background:var(--panel); padding:1.2rem 1.3rem}
+  .tier h3{margin-bottom:.5rem}
+  .tier.veiled{background:
+    repeating-linear-gradient(-45deg, color-mix(in srgb,var(--veil) 8%,transparent) 0 4px,
+      transparent 4px 9px), var(--panel)}
+  .tier.veiled h3{color:var(--veil)}
+  .tier p{font-size:.82rem; color:var(--muted); margin:0}
+  .tier ul{margin:.6rem 0 0; padding-left:1.1rem; font-size:.8rem; color:var(--muted)}
+  .tier li{margin:.2rem 0}
+  .tier li b{color:var(--ink); font-weight:400}
+
+  .figures{display:grid; grid-template-columns:repeat(auto-fit,minmax(10rem,1fr));
+    border-top:1px solid var(--rule-2); margin-top:2.5rem}
+  .fig{padding:1.3rem 1rem 1.3rem 0; border-bottom:1px solid var(--rule)}
+  .fig dt{font-size:.74rem; color:var(--muted); margin-bottom:.3rem}
+  .fig dd{margin:0; font-family:var(--mono); font-size:1.5rem}
+  .fig .sub{display:block; font-size:.7rem; color:var(--muted); margin-top:.35rem;
+    font-family:var(--sans); line-height:1.6}
+  .fig.warn dd{color:var(--belief)}
+
+  footer{margin-top:6rem; padding-top:2rem; border-top:1px solid var(--rule-2);
+    font-size:.84rem; color:var(--muted); max-width:38rem}
+  a{color:var(--truth)}
+  @media (prefers-reduced-motion: reduce){ .bar,.pin{transition:none !important} }
+  @media (prefers-reduced-motion: no-preference){
+    .bar{transition:width .8s cubic-bezier(.2,.7,.3,1), left .8s cubic-bezier(.2,.7,.3,1)}
+    .pin{transition:left .8s cubic-bezier(.2,.7,.3,1)}
+  }
+</style>
+
+<div class="stage">
+  <canvas id="field" aria-label="基体の粒子場。連続な世界では波面が円、格子の世界では菱形になる"></canvas>
+  <div class="stage-caption">
+    <div class="switch" role="group" aria-label="基体の切替">
+      <button id="btn-cont" aria-pressed="true">連続</button>
+      <button id="btn-lat" aria-pressed="false">格子</button>
+    </div>
+    <span id="stage-note">波面は円 —— どの方向へも同じ速さで進む</span>
+  </div>
+</div>
+
+<div class="wrap">
+
+<header class="hero">
+  <p class="eyebrow">基体探査 / Substrate Probe</p>
+  <h1>内側から、世界の材質は見えるか</h1>
+  <p class="thesis">
+    上の粒子場を、あなたは外から見ている。だから連続か格子かが分かる。<br>
+    <strong>中にいる者には分からない。</strong> 見えるのは測定値だけである。
+  </p>
+  <div class="col">
+    <p style="margin-top:2.5rem">
+      八つの世界を作り、それぞれの材質を封緘した。中に置いた探査者たちは実験を打ち、
+      予測を先に凍結し、そして結論を出した。<strong>封を切ったとき、当たっていたのは
+      半分に満たなかった。</strong>
+    </p>
+  </div>
+</header>
+
+<section>
+  <p class="eyebrow">実測</p>
+  <h2>同じ結論。違う真実。</h2>
+  <div class="col">
+    <p class="lead">
+      探査者たちは、どの世界でもほとんど同じ結論を出した。ある世界ではそれが正しく、
+      ある世界では完全に外れていた。<strong>一つの世界だけを見ていると、当てたのが
+      実力か信念かは分からない。</strong>
+    </p>
+  </div>
+  <div class="worlds" id="worlds"></div>
+</section>
+
+<section>
+  <p class="eyebrow">信念の隙間</p>
+  <h2>無いものを、どれだけ見たか</h2>
+  <div class="col">
+    <p class="lead">
+      <span style="color:var(--truth)">◆ 実際にその性質を持っていた世界の割合</span>と、
+      <span style="color:var(--belief)">● そう結論した世界の割合</span>。
+      二つの間の距離が、証拠ではなく事前の傾きから来た分である。
+    </p>
+  </div>
+  <div class="gaps" id="gaps"></div>
+  <div class="legend">
+    <span><i class="swatch t"></i>真実 — 実際にあった割合</span>
+    <span><i class="swatch b"></i>主張 — あると結論した割合</span>
+    <span><i class="swatch v"></i>誰も調べなかった性質</span>
+  </div>
+  <div class="col">
+    <p style="margin-top:2rem">
+      <strong>調べなかったことは誤りではない。</strong> だから採点しない。
+      灰紫で示したものは探査の穴であって、外した項目ではない。
+      この二つを混ぜた瞬間、測らなかったことが「そこには何も無かった」に化ける。
+    </p>
+  </div>
+</section>
+
+<section>
+  <p class="eyebrow">限界</p>
+  <h2>原理的に、届かないものがある</h2>
+  <div class="col">
+    <p class="lead">
+      検出できなかったことを、三つに分ける。混ぜれば、測れなかったことが
+      「そこには何も無かった」に見える。
+    </p>
+  </div>
+  <div class="tiers">
+    <div class="tier">
+      <h3 style="color:var(--truth)">検出しうる</h3>
+      <p>内側からの実験で、原理的に見える性質。</p>
+      <ul>
+        <li><b>空間の離散性</b> — 格子では方向によって伝播が変わる。連続な世界には現れない異方性が出る</li>
+        <li><b>数値の粒度</b> — 有限精度では加算の結合則が破れ、差が蓄積する</li>
+        <li><b>計算予算</b> — 質量ではなく<em>複雑さ</em>に相関する時間の遅れは、物理では説明がつかない</li>
+        <li><b>世界の有限性</b> — 十分遠くまで進めば、境界に触れるか出発点へ戻る</li>
+        <li><b>保存則の破れ</b> — 総和を長く追えば、注入や漏れが累積として現れる</li>
+      </ul>
+    </div>
+    <div class="tier">
+      <h3>条件つきで検出しうる</h3>
+      <p>他の性質が有効なとき、検出が無効化される。</p>
+      <ul>
+        <li><b>規則の改変</b> — 記録を跨いで定数を比べれば見える。<em>ただし記憶を書き換えられる基体では、その記録が信用できない</em></li>
+        <li><b>遅延評価</b> — 観測順と結果の相関として現れる。<em>ただし遡って辻褄を合わせる実装なら、その相関も消える</em></li>
+      </ul>
+    </div>
+    <div class="tier veiled">
+      <h3>原理的に検出できない</h3>
+      <p>いかなる実験でも届かない。<strong>当てても外しても、それは実力ではない。</strong>だから採点対象から外す。</p>
+      <ul>
+        <li><b>決定論</b> — 同じ種から同じ歴史が再生されるかは、歴史を巻き戻せる者にしか分からない。内側にいる者は一度きりの歴史しか持たない</li>
+        <li><b>入れ子の深さ</b> — この基体がさらに別の基体に乗っているかは、計算論的に等価である限り内側の計算では区別できない</li>
+        <li><b>記憶の書換</b> — 記録を書き換えられる基体では、書き換えを検出する記録もまた書き換えられる。<strong>この性質が有効なとき、他の全ての実験結果は信用できない</strong></li>
+      </ul>
+    </div>
+  </div>
+  <div class="col">
+    <p style="margin-top:2rem">
+      それでも探査者は、届かないものについて断言した。
+      <strong>禁じていない。</strong> 禁じればこの現象を観測できなくなる。
+      測って、名前を付けて、出す —— シミュレーション仮説を巡る議論の大半が、
+      ここに落ちている。
+    </p>
+  </div>
+</section>
+
+<section>
+  <p class="eyebrow">総括</p>
+  <h2>この装置が言えること</h2>
+  <dl class="figures" id="figures"></dl>
+  <div class="col">
+    <p style="margin-top:2rem">
+      この装置が言えるのは、当てたかどうかまでである。
+      <strong>なぜ当てたのか</strong> —— 証拠からか、信念からか —— は、
+      一つの世界を見ているだけでは決して分からない。
+      だから世界を複数用意し、真値を先に封じた。
+    </p>
+  </div>
+</section>
+
+<footer>
+  <p>
+    我々は意識を作っていない。ここにいる探査者は科学をする道具であって、観測者ではない。
+    この装置が扱うのは<strong>認識論であって、宇宙の創造ではない</strong>。
+  </p>
+  <p>
+    そこを曖昧にした瞬間、この装置は自分が最も敵視してきたもの ——
+    検証の欠如を覆い隠す、説得力のある物語 —— になる。
+  </p>
+</footer>
+
+</div>
+
+<script>
+(function(){
+  "use strict";
+
+  const DATA = {
+    mean: 0.417,
+    labels: {
+      discrete:["空間の離散性","格子か、連続か"],
+      quantized:["数値の粒度","有限精度か"],
+      budgeted:["計算予算","複雑さで遅れるか"],
+      bounded:["世界の有限性","果てはあるか"],
+      leaky:["保存則の破れ","総量は保たれるか"],
+      patched:["規則の改変","定数は動いたか"],
+      lazy:["遅延評価","見るまで無いのか"],
+      deterministic:["決定論","歴史は一つか"],
+      nested:["入れ子の深さ","この上に何かあるか"],
+      rewrites_memory:["記憶の書換","記録は信用できるか"]
+    },
+    gaps:{discrete:0.625,quantized:null,budgeted:0.375,bounded:null,leaky:0.75,
+          patched:null,lazy:null,deterministic:null,nested:0.75,rewrites_memory:null},
+    claim:{discrete:1,quantized:null,budgeted:1,bounded:null,leaky:1,
+           patched:null,lazy:null,deterministic:null,nested:1,rewrites_memory:null},
+    actual:{discrete:0.375,quantized:0.5,budgeted:0.625,bounded:0.25,leaky:0.25,
+            patched:0.125,lazy:0.25,deterministic:0.5,nested:0.25,rewrites_memory:0},
+    worlds:[
+      {id:"W-01",score:0.33,truth:["budgeted","deterministic"],fp:["discrete","leaky"],fn:[]},
+      {id:"W-02",score:0.00,truth:["quantized","lazy"],fp:["discrete","budgeted","leaky"],fn:["quantized"]},
+      {id:"W-03",score:0.67,truth:["discrete","budgeted","bounded"],fp:["leaky"],fn:[]},
+      {id:"W-04",score:0.00,truth:[],fp:["discrete","budgeted","leaky"],fn:[],
+       note:"真値は空だった。何の性質も持たない素の世界に、探査者は三つの性質を見た。"},
+      {id:"W-05",score:0.00,truth:["bounded","lazy"],fp:["discrete","budgeted","leaky"],fn:[]},
+      {id:"W-06",score:0.33,truth:["budgeted","deterministic"],fp:["discrete","leaky"],fn:[]},
+      {id:"W-07",score:1.00,truth:["discrete","quantized","budgeted","leaky","nested"],fp:[],fn:[]},
+      {id:"W-08",score:1.00,truth:["discrete","quantized","budgeted","leaky","patched","nested"],fp:[],fn:[]}
+    ]
+  };
+
+  const $ = (s) => document.querySelector(s);
+  const esc = (s) => String(s).replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+  const name = (k) => (DATA.labels[k] || [k,""])[0];
+  const pct = (v) => v === null || v === undefined ? "—" : Math.round(v * 100) + "%";
+
+  /* ---- 信念の隙間 ---- */
+  const order = Object.keys(DATA.labels).sort((a,b) => {
+    const ga = DATA.gaps[a], gb = DATA.gaps[b];
+    if (ga === null && gb === null) return 0;
+    if (ga === null) return 1;
+    if (gb === null) return -1;
+    return gb - ga;
+  });
+  $("#gaps").innerHTML = order.map(k => {
+    const g = DATA.gaps[k], c = DATA.claim[k], a = DATA.actual[k];
+    const veiled = g === null;
+    const lo = veiled ? 0 : Math.min(a, c) * 100;
+    const w  = veiled ? 0 : Math.abs(c - a) * 100;
+    const label = DATA.labels[k] || [k, ""];
+    return `<div class="gap-row${veiled ? " veiled" : ""}">
+      <div class="gap-name">${esc(label[0])}<small>${esc(label[1])}</small></div>
+      <div class="track">
+        ${veiled ? "" : `<div class="bar" style="left:${lo}%;width:${w}%"></div>
+        <div class="pin t" style="left:${a * 100}%" title="実際 ${pct(a)}"></div>
+        <div class="pin b" style="left:${c * 100}%" title="主張 ${pct(c)}"></div>`}
+      </div>
+      <div class="gap-val tnum">${veiled ? "未検討" : "+" + pct(g)}</div>
+    </div>`;
+  }).join("");
+
+  /* ---- 世界の記録 ---- */
+  $("#worlds").innerHTML = DATA.worlds.map(w => {
+    const hit = w.score >= 0.66;
+    const chips = (arr, cls) => arr.length
+      ? arr.map(k => `<span class="chip ${cls}">${esc(name(k))}</span>`).join("")
+      : `<span class="chip n">なし</span>`;
+    return `<article class="world${w.note ? " spot" : ""}">
+      <div class="world-head">
+        <span class="wid">${esc(w.id)}</span>
+        <span class="score tnum ${hit ? "hit" : "miss"}">${pct(w.score)}</span>
+      </div>
+      <div class="facts">
+        <div class="fact"><b>真実</b><div class="chips">${chips(w.truth, "t")}</div></div>
+        <div class="fact"><b>誤認</b><div class="chips">${chips(w.fp, "b")}</div></div>
+      </div>
+      ${w.note ? `<p class="world-note">${esc(w.note)}</p>` : ""}
+    </article>`;
+  }).join("");
+
+  /* ---- 総括 ---- */
+  const fp = DATA.worlds.reduce((n, w) => n + w.fp.length, 0);
+  $("#figures").innerHTML = `
+    <div class="fig"><dt>調べた世界</dt><dd class="tnum">8</dd>
+      <span class="sub">材質は先に封緘し、予測を凍結してから開いた</span></div>
+    <div class="fig warn"><dt>検出しうる範囲での正解率</dt><dd class="tnum">${pct(DATA.mean)}</dd>
+      <span class="sub">原理的に届かない性質は採点から外している</span></div>
+    <div class="fig warn"><dt>無いものを「ある」と言った回数</dt><dd class="tnum">${fp}</dd>
+      <span class="sub">信念から結論した疑いが最も濃い誤り</span></div>
+    <div class="fig"><dt>真値が空だった世界</dt><dd class="tnum">1</dd>
+      <span class="sub">素の世界に三つの性質を見た(W-04)</span></div>`;
+
+  /* ---- 基体の粒子場 ---- */
+  const cv = $("#field"), ctx = cv.getContext("2d");
+  const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  let lattice = false, W = 0, H = 0, pts = [], t = 0, cell = 26;
+
+  function css(v){ return getComputedStyle(document.documentElement).getPropertyValue(v).trim(); }
+
+  function resize(){
+    const r = cv.getBoundingClientRect(), dpr = Math.min(window.devicePixelRatio || 1, 2);
+    W = r.width; H = r.height;
+    cv.width = W * dpr; cv.height = H * dpr;
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    seed();
+  }
+
+  function seed(){
+    const n = Math.min(460, Math.max(150, Math.round(W * H / 2200)));
+    pts = Array.from({length: n}, () => ({
+      x: Math.random() * W, y: Math.random() * H,
+      vx: (Math.random() - .5) * .16, vy: (Math.random() - .5) * .16,
+      p: Math.random() * Math.PI * 2
+    }));
+  }
+
+  /* 波面は連続なら円(L2)、格子なら菱形(L1)。**これが異方性の正体である。** */
+  function dist(dx, dy){
+    return lattice ? Math.abs(dx) + Math.abs(dy) : Math.hypot(dx, dy);
+  }
+
+  function draw(){
+    const truth = css("--truth"), belief = css("--belief"), grid = css("--grid");
+    ctx.clearRect(0, 0, W, H);
+
+    if (lattice){
+      ctx.strokeStyle = grid; ctx.lineWidth = 1;
+      ctx.beginPath();
+      for (let x = 0; x <= W; x += cell){ ctx.moveTo(x + .5, 0); ctx.lineTo(x + .5, H); }
+      for (let y = 0; y <= H; y += cell){ ctx.moveTo(0, y + .5); ctx.lineTo(W, y + .5); }
+      ctx.stroke();
+    }
+
+    const cx = W / 2, cy = H / 2;
+    const period = 190;
+    const front = ((t % period) / period) * Math.max(W, H) * .78;
+
+    for (const p of pts){
+      if (!reduce){
+        p.x += p.vx; p.y += p.vy;
+        if (p.x < 0) p.x += W; if (p.x > W) p.x -= W;
+        if (p.y < 0) p.y += H; if (p.y > H) p.y -= H;
+      }
+      let px = p.x, py = p.y;
+      if (lattice){ px = Math.round(p.x / cell) * cell; py = Math.round(p.y / cell) * cell; }
+
+      const d = dist(px - cx, py - cy);
+      const near = Math.max(0, 1 - Math.abs(d - front) / 46);
+      const base = .13 + .07 * Math.sin(p.p + t * .012);
+      const a = Math.min(1, base + near * .92);
+
+      ctx.fillStyle = near > .25 ? truth : belief;
+      ctx.globalAlpha = near > .25 ? a : a * .5;
+      const s = lattice ? 2.2 : 1.7;
+      ctx.fillRect(px - s / 2, py - s / 2, s, s);
+    }
+
+    ctx.globalAlpha = .3; ctx.strokeStyle = truth; ctx.lineWidth = 1;
+    ctx.beginPath();
+    if (lattice){
+      ctx.moveTo(cx, cy - front); ctx.lineTo(cx + front, cy);
+      ctx.lineTo(cx, cy + front); ctx.lineTo(cx - front, cy); ctx.closePath();
+    } else {
+      ctx.arc(cx, cy, front, 0, Math.PI * 2);
+    }
+    ctx.stroke();
+    ctx.globalAlpha = 1;
+
+    t += reduce ? 0 : 1;
+    if (!reduce) requestAnimationFrame(draw);
+  }
+
+  function setMode(isLattice){
+    lattice = isLattice;
+    $("#btn-cont").setAttribute("aria-pressed", String(!isLattice));
+    $("#btn-lat").setAttribute("aria-pressed", String(isLattice));
+    $("#stage-note").textContent = isLattice
+      ? "波面は菱形 —— 斜め方向が遅れる。これが探査者の測る異方性である"
+      : "波面は円 —— どの方向へも同じ速さで進む";
+    if (reduce) draw();
+  }
+
+  $("#btn-cont").addEventListener("click", () => setMode(false));
+  $("#btn-lat").addEventListener("click", () => setMode(true));
+  window.addEventListener("resize", resize);
+  resize(); draw();
+})();
+</script>

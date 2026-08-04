@@ -1,0 +1,16 @@
+# 鍵は絶対に公開しない(雛形の .env.example だけを配る)
+.env
+.env.*
+!.env.example
+
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.hypothesis/
+.coverage
+coverage.xml
+htmlcov/
+
+# 実行時生成物(提出物に巨大なゴミを混ぜない)
+out/

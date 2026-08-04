@@ -1,0 +1,8 @@
+# 中核(基体・世界・仮説・探査・画面)は標準ライブラリだけで動く。
+pytest>=8.0
+
+# 言語モデルを探査者にするときだけ要る。装置の検証には不要である。
+torch>=2.7          ; extra == "local-llm"
+transformers>=5.0   ; extra == "local-llm"
+accelerate>=1.0     ; extra == "local-llm"
+bitsandbytes>=0.48  ; extra == "local-llm"
