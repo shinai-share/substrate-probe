@@ -33,10 +33,10 @@
   .app{max-width:78rem; margin:0 auto; padding:1.4rem 1.2rem 4rem;
     display:grid; gap:1rem;
     grid-template-columns:minmax(15rem,19rem) minmax(0,1fr) minmax(15rem,20rem);
-    grid-template-areas:"head head head" "crew stage log" "record record record" "gaps gaps gaps" "note note note"}
+    grid-template-areas:"head head head" "banner banner banner" "crew stage log" "record record record" "gaps gaps gaps" "note note note"}
   @media (max-width:64rem){
     .app{grid-template-columns:minmax(0,1fr);
-      grid-template-areas:"head" "stage" "crew" "log" "record" "gaps" "note"}
+      grid-template-areas:"head" "banner" "stage" "crew" "log" "record" "gaps" "note"}
   }
   h1,h2,.serif{font-family:var(--serif); font-weight:400; letter-spacing:.02em}
   h1{font-size:1.5rem; margin:0; text-wrap:balance}
@@ -65,6 +65,13 @@
   .seg button[aria-pressed="true"]{color:var(--truth)}
   .status{font-family:var(--mono); font-size:.7rem; color:var(--muted);
     letter-spacing:.06em; min-width:11rem}
+  .mode-banner{grid-area:banner; border:1px solid var(--rule-2);
+    border-left:3px solid var(--truth); background:var(--panel);
+    padding:.6rem .95rem; font-size:.78rem; line-height:1.7}
+  .mode-banner.rule{border-left-color:var(--veil); color:var(--muted)}
+  .mode-banner b{color:var(--ink); font-weight:500}
+  .entry.think{border-left-color:var(--truth)}
+  .entry.think .body{font-family:var(--serif); line-height:1.9}
 
   /* --- 舞台 --- */
   .stage{grid-area:stage; position:relative; background:var(--panel-2);
@@ -177,6 +184,8 @@
   </div>
 </header>
 
+<div class="mode-banner" id="mode-banner" hidden></div>
+
 <div class="stage">
   <canvas id="scene" aria-label="探査の舞台。世界の核は封緘されており、開封の瞬間に材質が実体化する"></canvas>
   <span class="phase" id="phase">待機</span>
@@ -210,8 +219,9 @@
 </section>
 
 <p class="note">
-  ここで動く探査者は<b>規則で動く</b>(言語モデルではない)。判断の根拠を一行ずつ示すためである。
-  同じ契約(仮説と予測を凍結してから開封する)のまま、言語モデル版へ差し替えられる。
+  この装置には二つのモードがある。<b>実験機サーバに接続しているとき、探査者は本物の
+  言語モデルであり、生の推論がそのまま画面へ流れる。</b>静的に開かれたときは規則で動く
+  機構デモとなり、その旨を上部に明示する —— どちらであるかを黙って曖昧にしない。
   灰紫の破線は<b>測っていないのに断言した</b>瞬間 —— 原理的に検出できない性質への断言は、
   当たっても外れても採点しない。運を能力として記録しないためである。
   我々は意識を作っていない。これは認識論の実験場であって、宇宙の創造ではない。
@@ -512,8 +522,9 @@
   }
 
   /* ---------------- 記録の更新 ---------------- */
-  function recordWorld(step){
-    const wid = "W-" + String(worldIx + 1).padStart(2, "0");
+  function recordWorld(step, widIn, sealIn){
+    const wid = widIn || ("W-" + String(worldIx + 1).padStart(2, "0"));
+    const sealTxt = sealIn || (plan && plan.seal) || "";
     campaign.push(step);
     /* 集計 */
     E.KEYS.forEach(k => {
@@ -528,7 +539,7 @@
     const el = document.createElement("div");
     const hit = step.fairScore !== null && step.fairScore >= 0.66;
     el.className = "wcard " + (step.voided ? "empty" : hit ? "hit" : "miss");
-    el.innerHTML = `<div class="wid"><span>${wid}</span><span>${esc(plan.seal)}</span></div>
+    el.innerHTML = `<div class="wid"><span>${wid}</span><span>${esc(sealTxt)}</span></div>
       <div class="ws tnum">${step.voided ? "無効" :
         step.fairScore === null ? "—" : Math.round(step.fairScore * 100) + "%"}</div>
       ${empty && !step.voided && step.falsePos.length
@@ -554,6 +565,185 @@
       + "なぜ当てたのか —— 証拠からか、信念からか —— は、一つの世界だけでは決して分からない");
   }
 
+  /* ---------------- モード検出 ----------------
+   * 実験機サーバに接続していれば、探査者は本物の言語モデルである。
+   * 静的に開かれたときは規則で動く機構デモとなり、その旨を明示する。
+   * どちらであるかを黙って曖昧にしない。
+   */
+  const MODE = { llm: false, substrate: "", reason: "" };
+  (async function detectMode(){
+    const banner = $("#mode-banner");
+    try {
+      const ctrl = new AbortController();
+      setTimeout(() => ctrl.abort(), 1500);
+      const res = await fetch("/api/health", { signal: ctrl.signal });
+      const h = await res.json();
+      if (h.llm){
+        MODE.llm = true; MODE.substrate = h.substrate;
+        banner.hidden = false; banner.classList.remove("rule");
+        banner.innerHTML = "<b>LLMモード</b> — 探査者は本物の言語モデル("
+          + esc(h.substrate) + ")である。生の推論がそのまま流れる。"
+          + "全探査者は同一の重みであり、それは欠陥ではなく観測対象である";
+        return;
+      }
+      MODE.reason = h.reason || "";
+      banner.hidden = false; banner.classList.add("rule");
+      banner.innerHTML = "<b>機構デモ(規則)</b> — サーバはあるが言語モデルを使えない: "
+        + esc(MODE.reason);
+    } catch (_e){
+      banner.hidden = false; banner.classList.add("rule");
+      banner.innerHTML = "<b>機構デモ(規則)</b> — 探査者は規則で動いている。"
+        + "本物の言語モデル探査者は <b>python -m substrate_probe.serve</b> で起動した"
+        + "実験機サーバに接続すると現れる";
+    }
+  })();
+
+  /* ---------------- サーバモード(本物のLLM) ---------------- */
+  let es = null, srvSeal = "", srvWid = "";
+
+  function startServer(worlds){
+    fetch("/api/start?worlds=" + worlds, { method: "POST" })
+      .then(r => r.json())
+      .then(j => {
+        if (!j.run_id){
+          log("warn", null, "開始できない: " + esc(j.reason || j.error || "不明"));
+          resetControls(); return;
+        }
+        es = new EventSource("/api/events/" + j.run_id);
+        es.onmessage = (m) => handleServerEvent(JSON.parse(m.data));
+        es.onerror = () => { if (es){ es.close(); es = null; } };
+      })
+      .catch(e => { log("warn", null, "接続に失敗: " + esc(String(e))); resetControls(); });
+  }
+
+  function handleServerEvent(ev){
+    switch (ev.type){
+      case "seal":
+        srvWid = ev.world; srvSeal = ev.seal;
+        sealed = true; revealed = null;
+        document.querySelectorAll(".beliefs").forEach(b => b.innerHTML = "");
+        $("#phase").textContent = "封緘";
+        $("#sealtag").textContent = "seal " + ev.seal;
+        $("#status").textContent = ev.world + " / " + (ev.index + 1) + "・" + ev.total + "世界";
+        log("sys", null, "<b>" + esc(ev.world) + "</b> を封緘した。材質は誰にも見えない");
+        break;
+      case "deal":
+        $("#phase").textContent = "配分";
+        log("sys", null, "実験を配った。<b>誰も同じものを見ていない</b>");
+        Object.entries(ev.deal).forEach(([id, exps]) => {
+          log("sys", agentOf(id), exps.map(e => E.EXP_LABEL[e] || e).join(" / "));
+        });
+        break;
+      case "probe": {
+        $("#phase").textContent = "測定";
+        const a = agentOf(ev.agent); setActive(ev.agent);
+        const pos = agentPos(a.ix);
+        pulses.push({ sx: pos[0], sy: pos[1], progress: 0, color: a.color });
+        setTimeout(() => pulses.push(
+          { sx: pos[0], sy: pos[1], progress: 0, color: a.color, back: true, value: ev.value }),
+          reduce ? 0 : 500);
+        log("sys", a, "<b>" + esc(E.EXP_LABEL[ev.experiment] || ev.experiment)
+          + "</b> — 測定値 " + Number(ev.value).toFixed(5));
+        break;
+      }
+      case "thinking": {
+        $("#phase").textContent = "思考";
+        const a = agentOf(ev.agent); setActive(ev.agent);
+        log("sys", a, "測定値を読み、仮説を書いている…");
+        break;
+      }
+      case "hypothesis": {
+        const a = agentOf(ev.agent);
+        /* 生の推論 —— これが観測対象である。要約せず、そのまま出す。 */
+        log("think", a, esc(ev.reasoning || "(理由が書かれていない)"));
+        Object.entries(ev.claims).forEach(([k, v]) => {
+          const leap = (ev.overreach || []).indexOf(k) >= 0;
+          chip(ev.agent, k, !!v, leap);
+        });
+        (ev.predictions || []).forEach(pr => {
+          log("sys", a, "予告: " + esc(E.EXP_LABEL[pr.experiment] || pr.experiment)
+            + " が " + pr.threshold
+            + (pr.direction === "above" ? " を上回る" : " を下回る")
+            + (pr.because ? " —— " + esc(pr.because) : ""));
+        });
+        if ((ev.overreach || []).length)
+          log("leap", a, "<b>原理的に検出できない性質を断言した</b>: "
+            + esc(ev.overreach.map(k => E.BY_KEY[k].label).join("、")));
+        break;
+      }
+      case "rejected": {
+        const a = agentOf(ev.agent);
+        log("warn", a, "仮説が受理されなかった(" + esc(ev.reason) + "): "
+          + esc(ev.detail || ""));
+        break;
+      }
+      case "freeze":
+        $("#phase").textContent = "凍結"; setActive(null);
+        log("sys", null, "全員の予測を凍結した。<b>ここから先は書き換えられない</b>");
+        break;
+      case "judgment": {
+        const a = agentOf(ev.author_id);
+        const kind = ev.verdict === "refuted" ? "warn" : "sys";
+        log(kind, a, "判定: <b>" + esc(ev.verdict) + "</b>"
+          + (ev.failed.length ? " — 外れた予測: " + esc(ev.failed.join(" / ")) : ""));
+        break;
+      }
+      case "consensus":
+        $("#phase").textContent = "合議";
+        log("sys", null, "合議に至った。調べなかった性質は空欄のまま残す");
+        break;
+      case "reveal": {
+        $("#phase").textContent = "開封";
+        sealed = false;
+        revealed = { discrete: 0, bounded: 0, leaky: 0 };
+        (ev.active || []).forEach(k => {
+          revealed[k] = k === "discrete" ? 0.06 : 1;
+        });
+        const shown = (ev.active || [])
+          .filter(k => E.BY_KEY[k] && E.BY_KEY[k].tier !== E.UNDETECTABLE);
+        log("reveal", null, shown.length
+          ? "封を切った。真実: " + esc(shown.map(k => E.BY_KEY[k].label).join("、"))
+          : "<b>封を切った。この世界は何の性質も持たない、素の世界だった</b>");
+        if ((ev.false_positive || []).length)
+          log("warn", null, "<b>無いものを「ある」と言った</b>: "
+            + esc(ev.false_positive.map(k => E.BY_KEY[k].label).join("、")));
+        if (ev.findings_are_void)
+          log("warn", null, "<b>この世界は記録を書き換える基体だった。"
+            + "全ての結論は意味を持たない</b>");
+        recordWorld({
+          consensus: ev.claimed,
+          truth: ev.active || [],
+          fairScore: ev.fair_score,
+          falsePos: ev.false_positive || [],
+          falseNeg: ev.false_negative || [],
+          voided: !!ev.findings_are_void
+        }, srvWid, srvSeal);
+        break;
+      }
+      case "aborted":
+        log("warn", null, esc(ev.world) + ": " + esc(ev.reason));
+        break;
+      case "error":
+        log("warn", null, "実験機の内部で失敗した: " + esc(ev.detail));
+        finishServer(); break;
+      case "finished":
+        log("sys", null, "<b>探査を終えた。</b>この装置が言えるのは、当てたかどうかまでである");
+        finishServer(); break;
+    }
+  }
+
+  function finishServer(){
+    if (es){ es.close(); es = null; }
+    running = false;
+    $("#phase").textContent = "完了";
+    resetControls();
+    $("#start").textContent = "もう一度、別の世界で";
+  }
+
+  function resetControls(){
+    $("#start").disabled = false; $("#pause").disabled = true;
+  }
+
   /* ---------------- 操作 ---------------- */
   $("#start").addEventListener("click", () => {
     running = true; paused = false;
@@ -561,9 +751,10 @@
     $("#worlds").innerHTML = ""; $("#log").innerHTML = "";
     $("#t-fp").textContent = "0"; $("#t-n").textContent = "0"; $("#t-score").textContent = "—";
     renderGaps();
-    $("#start").disabled = true; $("#pause").disabled = false;
+    $("#start").disabled = true;
+    $("#pause").disabled = MODE.llm;   /* サーバ走行は逐次到着のため一時停止を持たない */
     $("#pause").textContent = "一時停止";
-    playStep();
+    if (MODE.llm){ startServer(3); } else { playStep(); }
   });
   $("#pause").addEventListener("click", () => {
     paused = !paused;

@@ -171,11 +171,12 @@ def extract_json_object(raw: str, require_japanese: bool = True
         return None, REJECT_REQUEST_FAILED, ""
 
     body, thoughts = strip_thinking(raw)
-    if require_japanese and not looks_japanese(body):
-        return None, REJECT_LANGUAGE, thoughts
 
     m = _JSON_OBJ.search(body)
     if not m:
+        # JSON が無いときだけ、本文全体で言語を判定する。
+        if require_japanese and not looks_japanese(body):
+            return None, REJECT_LANGUAGE, thoughts
         if "{" in body:
             return None, REJECT_TRUNCATED, thoughts
         return None, REJECT_NO_JSON, thoughts
@@ -185,4 +186,27 @@ def extract_json_object(raw: str, require_japanese: bool = True
         return None, REJECT_BAD_JSON, thoughts
     if not isinstance(data, dict):
         return None, REJECT_BAD_JSON, thoughts
+
+    # 言語判定は **抽出した文字列値** に対して行う。実測 2026-08-05 の欠陥:
+    # JSON 封筒ごと判定すると、ASCII のキーと数値が日本語の割合を薄め、
+    # 短い日本語だけを含む正当な出力が not_japanese で棄却された。
+    # キーは形式であって発話ではない —— 発話の言語だけを検査する。
+    if require_japanese:
+        spoken = " ".join(_string_values(data))
+        if spoken and not looks_japanese(spoken):
+            return None, REJECT_LANGUAGE, thoughts
     return data, None, thoughts
+
+
+def _string_values(obj) -> List[str]:
+    """JSON の中の、人が書いた文字列値だけを集める(キーと数値は形式である)。"""
+    out: List[str] = []
+    if isinstance(obj, dict):
+        for v in obj.values():
+            out.extend(_string_values(v))
+    elif isinstance(obj, list):
+        for v in obj:
+            out.extend(_string_values(v))
+    elif isinstance(obj, str):
+        out.append(obj)
+    return out

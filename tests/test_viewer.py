@@ -155,10 +155,22 @@ def test_the_page_refuses_to_claim_consciousness(app):
     assert "認識論の実験場" in app
 
 
-def test_rule_based_agents_are_disclosed(app):
-    """探査者が規則で動くことを隠さない。言語モデル版への差替も明記する。"""
-    assert "規則で動く" in app
-    assert "言語モデル版へ差し替えられる" in app
+def test_both_modes_are_disclosed_honestly(app):
+    """どちらのモードで動いているかを黙って曖昧にしない。
+
+    LLMモードでは本物の言語モデルであることと基体名を、静的モードでは規則で
+    動いていることと本物への起動手順を、バナーで明示する。
+    """
+    assert "LLMモード" in app and "本物の言語モデル" in app
+    assert "機構デモ(規則)" in app
+    assert "python -m substrate_probe.serve" in app
+    assert "同一の重みであり、それは欠陥ではなく観測対象である" in app
+
+
+def test_llm_reasoning_is_rendered_raw(app):
+    """生の推論を要約せず、そのまま出す。これが観測対象である。"""
+    assert "ev.reasoning" in app
+    assert 'log("think"' in app
 
 
 def test_output_is_escaped(app):
